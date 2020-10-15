@@ -1,13 +1,10 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using UnityEngine;
-using UnityEngine.AddressableAssets;
 using UnityEngine.Rendering;
 using UnityEngine.SceneManagement;
-using UnityEngine.Serialization;
 #if UNITY_EDITOR
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -42,6 +39,8 @@ namespace BoatAttack.Benchmark
         {
             if (settings == null) AppSettings.ExitGame("Benchmark Not Setup");
 
+            if(settings.disableVSync)
+                QualitySettings.vSyncCount = 0;
             SceneManager.sceneLoaded += OnSceneLoaded;
             _stats = gameObject.AddComponent<PerfomanceStats>();
             DontDestroyOnLoad(gameObject);
@@ -76,10 +75,10 @@ namespace BoatAttack.Benchmark
                     AppSettings.ExitGame("Benchmark Not Setup");
                     break;
             }
-            
+
             runFrames = _settings.runLength;
             runNumber = _settings.runs;
-            
+
             _stats.enabled = _settings.stats;
             if(_settings.stats)
                 _stats.StartRun(_settings.benchmarkName, _settings.runLength);
@@ -147,7 +146,7 @@ namespace BoatAttack.Benchmark
                     _perfData[benchIndex].Add(stats);
                 }
             }
-            
+
             var path = GetResultPath() + $"/{_perfData[benchIndex][0].info.BenchmarkName}.txt";
             var data = new string[_perfData[benchIndex].Count];
 

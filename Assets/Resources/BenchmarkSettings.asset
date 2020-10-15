@@ -16,7 +16,7 @@ MonoBehaviour:
   saveData: 1
   benchmarks:
   - benchmarkName: Island Flythrough
-    sceneAsset: {fileID: 0}
+    sceneAsset: {fileID: 102900000, guid: c7a97972985ccaf4a9c8daf7e1db85ed, type: 3}
     scene: Assets/scenes/Testing/benchmark_island-flythrough.unity
     type: 0
     runs: 5
@@ -24,7 +24,7 @@ MonoBehaviour:
     warmup: 1
     stats: 1
   - benchmarkName: Island Static Shot
-    sceneAsset: {fileID: 0}
+    sceneAsset: {fileID: 102900000, guid: bf8529d52d0dac843b94245ecf955d4a, type: 3}
     scene: Assets/scenes/Testing/benchmark_island-static.unity
     type: 0
     runs: 1

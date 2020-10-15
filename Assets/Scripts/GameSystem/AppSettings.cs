@@ -293,8 +293,6 @@ namespace BoatAttack
             return $"level_{Levels[level]}";
         }
 
-        public static readonly List<string> QualityLevels = new List<string>(){"Low", "Medium", "High"};
-
         public static readonly string[] AiNames =
         {
             "Felipe",

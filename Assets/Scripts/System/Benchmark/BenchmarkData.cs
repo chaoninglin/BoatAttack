@@ -12,9 +12,10 @@ namespace BoatAttack.Benchmark
     {
         public FinishAction finishAction;
         public bool saveData;
+        public bool disableVSync = true;
         public List<BenchmarkSettings> benchmarks = new List<BenchmarkSettings>();
     }
-    
+
     [Serializable]
     public enum BenchmarkType
     {
