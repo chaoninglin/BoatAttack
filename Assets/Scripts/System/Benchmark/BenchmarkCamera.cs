@@ -35,7 +35,8 @@ namespace BoatAttack.Benchmark
                 {
                     if (!benchCam.Dolly) continue;
 
-                    benchCam.Dolly.m_PathPosition += 1f / Benchmark.runFrames;
+                    var frames = Benchmark.runFrames > 0 ? Benchmark.runFrames : 1000;
+                    benchCam.Dolly.m_PathPosition += 1f / frames;
                     benchCam.Dolly.m_PathPosition = Mathf.Repeat(benchCam.Dolly.m_PathPosition, 1f);
                 }
             }

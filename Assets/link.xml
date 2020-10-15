@@ -1,0 +1,10 @@
+<linker>
+       <assembly fullname="Unity.PerformanceTesting" preserve="all"/>
+	   <assembly fullname="Unity.GraphicTests.Performance.Runtime" preserve="all"/>
+	   <assembly fullname="Unity.PerformanceTesting.Editor" preserve="all"/>
+	   <assembly fullname="Unity.GraphicTests.Performance.Editor" preserve="all"/>
+	   <assembly fullname="UnityEngine.TestTools.Graphics" preserve="all"/>
+	   <assembly fullname="Unity.GraphicTests.Performance.Universal.Runtime" preserve="all"/>	
+       <assembly fullname="com.unity.test.performance.runtimesettings" preserve="all"/>		
+	   <assembly fullname="com.unity.test.metadata-manager" preserve="all"/>			   
+</linker>

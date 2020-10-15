@@ -33,13 +33,17 @@ public class BenchmarkWindow : EditorWindow
     private string[] resultFiles;
     private int currentResult;
     private int currentRun = 0;
+    private BuildTarget target;
 
     // TempUI vars
     private bool resultInfoHeader;
     private bool resultDataHeader;
+    private bool toolsBuildHeader;
+    private bool toolsSettingsHeader;
 
     private void OnEnable()
     {
+        target = EditorUserBuildSettings.activeBuildTarget;
         assetGUID = EditorPrefs.GetString(assetGuidKey);
         benchData = AssetDatabase.LoadAssetAtPath<BenchmarkData>(AssetDatabase.GUIDToAssetPath(assetGUID));
     }
@@ -68,7 +72,43 @@ public class BenchmarkWindow : EditorWindow
 
     private void DrawTools()
     {
-        GUILayout.Label("Tools Page");
+        EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+        toolsBuildHeader = EditorGUILayout.BeginFoldoutHeaderGroup(toolsBuildHeader, "Build");
+        if (toolsBuildHeader)
+        {
+            DrawBuildSettings();
+        }
+        EditorGUILayout.EndFoldoutHeaderGroup();
+        EditorGUILayout.EndVertical();
+
+        EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+        toolsSettingsHeader = EditorGUILayout.BeginFoldoutHeaderGroup(toolsSettingsHeader, "Benchmark Settings");
+        if (toolsSettingsHeader)
+        {
+            DrawBenchmarkSettings();
+        }
+        EditorGUILayout.EndFoldoutHeaderGroup();
+        EditorGUILayout.EndVertical();
+    }
+
+    private void DrawBuildSettings()
+    {
+        target = (BuildTarget)EditorGUILayout.EnumPopup("Build Target", target);
+        GUILayout.Label("Build to current platform");
+        if (GUILayout.Button($"Build {target}"))
+        {
+            BuildBenchmark();
+        }
+
+        GUILayout.Label("Build static scene");
+        if (GUILayout.Button($"Build Static scene"))
+        {
+            BuildStaticBenchmark();
+        }
+    }
+
+    private void DrawBenchmarkSettings()
+    {
         EditorGUI.BeginChangeCheck();
         benchData = (BenchmarkData) EditorGUILayout.ObjectField(new GUIContent("Benchmark Data File"), benchData,
             typeof(BenchmarkData), false);
@@ -77,21 +117,6 @@ public class BenchmarkWindow : EditorWindow
             AssetDatabase.TryGetGUIDAndLocalFileIdentifier(benchData, out assetGUID, out long _);
             EditorPrefs.SetString(assetGuidKey, assetGUID);
         }
-        EditorGUILayout.BeginHorizontal();
-        GUILayout.Label("Build to current platform");
-        if (GUILayout.Button($"Build {EditorUserBuildSettings.activeBuildTarget.ToString()}"))
-        {
-            BuildBenchmark();
-        }
-        EditorGUILayout.EndHorizontal();
-
-        EditorGUILayout.BeginHorizontal();
-        GUILayout.Label("Build static scene");
-        if (GUILayout.Button($"Build Static scene"))
-        {
-            BuildStaticBenchmark();
-        }
-        EditorGUILayout.EndHorizontal();
     }
 
     private void BuildBenchmark()
@@ -115,14 +140,20 @@ public class BenchmarkWindow : EditorWindow
 
     private void Build(ref BuildPlayerOptions options)
     {
-        var curTarget = EditorUserBuildSettings.activeBuildTarget;
-        options.locationPathName = $"Builds/Benchmark/{curTarget:G}/BoatattackBenchmark";
-        options.target = curTarget;
+        options.locationPathName = $"Builds/Benchmark/{target:G}/BoatattackBenchmark";
+        options.target = target;
         options.options = BuildOptions.Development;
 
+        var curTar = EditorUserBuildSettings.activeBuildTarget;
+        if (target != curTar)
+        {
+            EditorUserBuildSettings.SwitchActiveBuildTarget(target);
+        }
         AutoBuildAddressables.Popup();
         var report = BuildPipeline.BuildPlayer(options);
         var summary = report.summary;
+
+        EditorUserBuildSettings.SwitchActiveBuildTarget(curTar);
 
         switch (summary.result)
         {

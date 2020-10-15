@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using BoatAttack;
 using BoatAttack.Benchmark;
 using UnityEngine;
@@ -9,13 +10,23 @@ public class PerfomanceStats : MonoBehaviour
 {
 	// Frame time stats
 	private PerfBasic Stats;
+	public bool autoMode = false;
 
 	private List<float> samples = new List<float>();// in microseconds
     private int totalSamples = 250;
 
     // UI display
-    public Text frametimeDisplay;
+    private Text frametimeDisplay;
     private string debugInfo;
+
+    private void Start()
+    {
+	    if (autoMode)
+	    {
+		    Stats = new PerfBasic("test", 1000) {RunIndex = Benchmark.currentRunNumber};
+		    CreateTextGui();
+	    }
+    }
 
     public void StartRun(string benchmarkName, int runLength)
     {
@@ -27,6 +38,13 @@ public class PerfomanceStats : MonoBehaviour
     private void Update ()
     {
 	    if (!frametimeDisplay) return;
+
+	    if (autoMode)
+	    {
+		    Benchmark.currentRunFrames++;
+		    if (Benchmark.currentRunFrames > 1000)
+			    Benchmark.currentRunFrames = 0;
+	    }
 
 		frametimeDisplay.text = "";
         // sample frametime
