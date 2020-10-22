@@ -8,12 +8,14 @@ using UnityEngine.Serialization;
 namespace BoatAttack.Benchmark
 {
     [CreateAssetMenu(fileName = "BenchmarkSettings", menuName = "Boat Attack/System/Benchmark Settings")]
-    public class BenchmarkData : ScriptableObject
+    public class BenchmarkConfigData : ScriptableObject
     {
         public FinishAction finishAction;
         public bool saveData;
         public bool disableVSync = true;
-        public List<BenchmarkSettings> benchmarks = new List<BenchmarkSettings>();
+        public bool stats = false;
+        [NonReorderable]
+        public List<BenchmarkData> benchmarkData = new List<BenchmarkData>();
     }
 
     [Serializable]
@@ -39,7 +41,7 @@ namespace BoatAttack.Benchmark
     }
 
     [Serializable]
-    public class BenchmarkSettings
+    public class BenchmarkData
     {
         public string benchmarkName;
 #if UNITY_EDITOR
@@ -50,6 +52,6 @@ namespace BoatAttack.Benchmark
         public int runs = 4;
         public int runLength = 1000;
         public bool warmup;
-        public bool stats = false;
+        public bool enabled = true;
     }
 }

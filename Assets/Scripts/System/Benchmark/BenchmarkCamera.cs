@@ -7,9 +7,15 @@ namespace BoatAttack.Benchmark
     public class BenchmarkCamera : MonoBehaviour
     {
         public BenchmarkCameraSettings[] cameras;
+        private int Frames = 1000;
 
         private void Awake()
         {
+            if (Benchmark.current != null)
+            {
+                Frames = Benchmark.current.runLength;
+            }
+
             foreach (var cam in cameras)
             {
                 switch (cam.type)
@@ -35,8 +41,7 @@ namespace BoatAttack.Benchmark
                 {
                     if (!benchCam.Dolly) continue;
 
-                    var frames = Benchmark.runFrames > 0 ? Benchmark.runFrames : 1000;
-                    benchCam.Dolly.m_PathPosition += 1f / frames;
+                    benchCam.Dolly.m_PathPosition += 1f / Frames;
                     benchCam.Dolly.m_PathPosition = Mathf.Repeat(benchCam.Dolly.m_PathPosition, 1f);
                 }
             }

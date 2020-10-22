@@ -14,20 +14,20 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   finishAction: 0
   saveData: 1
-  benchmarks:
+  disableVSync: 1
+  stats: 1
+  benchmarkData:
   - benchmarkName: Island Flythrough
     sceneAsset: {fileID: 102900000, guid: c7a97972985ccaf4a9c8daf7e1db85ed, type: 3}
-    scene: Assets/scenes/Testing/benchmark_island-flythrough.unity
+    scene: Assets/scenes/testing/benchmark_island-flythrough.unity
     type: 0
-    runs: 5
-    runLength: 300
-    warmup: 1
-    stats: 1
-  - benchmarkName: Island Static Shot
-    sceneAsset: {fileID: 102900000, guid: bf8529d52d0dac843b94245ecf955d4a, type: 3}
-    scene: Assets/scenes/Testing/benchmark_island-static.unity
-    type: 0
-    runs: 1
+    runs: 3
     runLength: 500
     warmup: 1
-    stats: 1
+  - benchmarkName: Island Static
+    sceneAsset: {fileID: 102900000, guid: bf8529d52d0dac843b94245ecf955d4a, type: 3}
+    scene: Assets/scenes/testing/benchmark_island-static.unity
+    type: 0
+    runs: 5
+    runLength: 25
+    warmup: 0

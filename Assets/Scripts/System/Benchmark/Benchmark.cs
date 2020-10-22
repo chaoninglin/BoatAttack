@@ -15,16 +15,20 @@ namespace BoatAttack.Benchmark
     public class Benchmark : MonoBehaviour
     {
         // data
-        public BenchmarkData settings;
+        [HideInInspector] public int simpleRunScene = -1;
+        public BenchmarkConfigData settings;
+        public bool simpleRun = false;
+        public static bool SimpleRun;
         private int benchIndex;
-        private static BenchmarkSettings _settings;
+        public static BenchmarkData current { get; private set; }
+
         private static PerfomanceStats _stats;
 
         // Timing data
-        public static int runNumber;
-        public static int currentRunNumber;
-        public static int runFrames;
-        public static int currentRunFrames;
+        //public static int totalRuns;
+        public static int currentRunIndex;
+        //public static int totalFrames;
+        public static int currentRunFrame;
         private int totalRunFrames;
         private bool running = false;
 
@@ -44,7 +48,18 @@ namespace BoatAttack.Benchmark
             SceneManager.sceneLoaded += OnSceneLoaded;
             _stats = gameObject.AddComponent<PerfomanceStats>();
             DontDestroyOnLoad(gameObject);
-            LoadBenchmark(settings.benchmarks[benchIndex]);
+
+            if (simpleRun && settings.benchmarkData?[simpleRunScene] != null)
+            {
+                SimpleRun = simpleRun;
+                current = settings.benchmarkData[simpleRunScene];
+                LoadBenchmark();
+            }
+            else
+            {
+                current = settings.benchmarkData[benchIndex];
+                LoadBenchmark();
+            }
         }
 
         private void OnDestroy()
@@ -52,20 +67,28 @@ namespace BoatAttack.Benchmark
             RenderPipelineManager.endFrameRendering -= EndFrameRendering;
         }
 
-        private void LoadBenchmark(BenchmarkSettings setting)
+        private void LoadBenchmark()
         {
             _perfData.Add(benchIndex, new List<PerfBasic>());
-            _settings = setting;
-            AppSettings.LoadScene(setting.scene);
+            AppSettings.LoadScene(current.scene);
         }
 
         private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
-            if (scene.path != _settings.scene) return;
+            if (scene.path != current.scene) return;
 
-            if (_settings.warmup) currentRunNumber = -1;
+            if (current.warmup)
+            {
+                currentRunIndex = -1;
+            }
+            else
+            {
+                currentRunIndex = 0;
+            }
 
-            switch (_settings.type)
+            currentRunFrame = 0;
+
+            switch (current.type)
             {
                 case BenchmarkType.Scene:
                     break;
@@ -76,12 +99,9 @@ namespace BoatAttack.Benchmark
                     break;
             }
 
-            runFrames = _settings.runLength;
-            runNumber = _settings.runs;
-
-            _stats.enabled = _settings.stats;
-            if(_settings.stats)
-                _stats.StartRun(_settings.benchmarkName, _settings.runLength);
+            _stats.enabled = settings.stats;
+            if(settings.stats)
+                _stats.StartRun(current.benchmarkName, current.runLength);
 
             BeginRun();
             RenderPipelineManager.endFrameRendering += EndFrameRendering;
@@ -89,17 +109,17 @@ namespace BoatAttack.Benchmark
 
         private void BeginRun()
         {
-            currentRunFrames = 0;
+            currentRunFrame = 0;
         }
 
         private void EndFrameRendering(ScriptableRenderContext context, Camera[] cameras)
         {
-            currentRunFrames++;
-            if (currentRunFrames <= _settings.runLength) return;
+            currentRunFrame++;
+            if (currentRunFrame < current.runLength) return;
             _stats.EndRun();
 
-            currentRunNumber++;
-            if (currentRunNumber < _settings.runs)
+            currentRunIndex++;
+            if (currentRunIndex < current.runs || simpleRun)
             {
                 BeginRun();
             }
@@ -114,31 +134,38 @@ namespace BoatAttack.Benchmark
         {
             if(settings.saveData) SaveBenchmarkStats();
             benchIndex++;
-            if (benchIndex < settings.benchmarks.Count)
+
+            if (benchIndex < settings.benchmarkData.Count)
             {
-                LoadBenchmark(settings.benchmarks[benchIndex]);
+                current = settings.benchmarkData[benchIndex];
+                LoadBenchmark();
             }
             else
             {
-                switch (settings.finishAction)
-                {
-                    case FinishAction.Exit:
-                        AppSettings.ExitGame();
-                        break;
-                    case FinishAction.ShowStats:
-                        break;
-                    case FinishAction.Nothing:
-                        break;
-                    default:
-                        AppSettings.ExitGame("Benchmark Not Setup");
-                        break;
-                }
+                FinishBenchmark();
+            }
+        }
+
+        private void FinishBenchmark()
+        {
+            switch (settings.finishAction)
+            {
+                case FinishAction.Exit:
+                    AppSettings.ExitGame();
+                    break;
+                case FinishAction.ShowStats:
+                    break;
+                case FinishAction.Nothing:
+                    break;
+                default:
+                    AppSettings.ExitGame("Benchmark Not Setup");
+                    break;
             }
         }
 
         private void SaveBenchmarkStats()
         {
-            if (_settings.stats)
+            if (settings.stats)
             {
                 var stats = _stats.EndBench();
                 if (stats != null)
@@ -241,43 +268,74 @@ namespace BoatAttack.Benchmark
     public class PerfBasic
     {
         public TestInfo info;
-        public float RunTime;
-        public int RunIndex;
         public int Frames;
-        public float AvgMs;
-        public float MinMs = Single.PositiveInfinity;
-        public float MinMSFrame;
-        public float MaxMs = Single.NegativeInfinity;
-        public float MaxMSFrame;
-        public FrameTimes[] RunData;
+        public RunData[] RunData;
 
         public PerfBasic(string benchmarkName, int frames)
         {
             Frames = frames;
             info = new TestInfo(benchmarkName);
-            RunData = new FrameTimes[Benchmark.runNumber];
+            RunData = new RunData[Benchmark.current.runs];
+            for (var index = 0; index < RunData.Length; index++)
+            {
+                RunData[index] = new RunData(new float[frames]);
+            }
         }
-
-        public void Run(int runIndex, float[] frames)
-        {
-            RunData[runIndex] = new FrameTimes(frames);
-        }
-
-        public float Average
-        {
-            get => AvgMs;
-            set => AvgMs = value;
-        }
-        public void SetMin(float ms, int frame) { MinMs = ms; MinMSFrame = frame; }
-        public void SetMax(float ms, int frame) { MaxMs = ms; MaxMSFrame = frame; }
     }
 
     [Serializable]
-    public class FrameTimes
+    public class RunData
     {
+        public float RunTime;
+        public float AvgMs;
+        public FrameData MinFrame = FrameData.DefaultMin;
+        public FrameData MaxFrame = FrameData.DefaultMax;
         public float[] rawSamples;
 
-        public FrameTimes(float[] times) { rawSamples = times; }
+        public RunData(float[] times) { rawSamples = times; }
+
+        public void Average()
+        {
+            AvgMs = 0.0f;
+            foreach (var sample in rawSamples)
+            {
+                AvgMs += sample / rawSamples.Length;
+            }
+        }
+        public void SetMin(float ms, int frame) { MinFrame.ms = ms; MinFrame.frameIndex = frame; }
+        public void SetMax(float ms, int frame) { MaxFrame.ms = ms; MaxFrame.frameIndex = frame; }
+
+        public void EndRun(float runtime, FrameData min, FrameData max)
+        {
+            RunTime = runtime;
+            MinFrame = min;
+            MaxFrame = max;
+            Average();
+        }
+
+    }
+
+    [Serializable]
+    public class FrameData
+    {
+        public int frameIndex;
+        public float ms;
+
+        public FrameData(int frameNumber, float frameTime)
+        {
+            frameIndex = frameNumber;
+            ms = frameTime;
+        }
+
+        public void Set(int frameNumber, float frameTime)
+        {
+            frameIndex = frameNumber;
+            ms = frameTime;
+        }
+
+        public static FrameData DefaultMin => new FrameData(-1, Single.PositiveInfinity);
+
+        public static FrameData DefaultMax => new FrameData(-1, Single.NegativeInfinity);
     }
 
     [Serializable]
