@@ -10,7 +10,6 @@ namespace BoatAttack.Benchmark
     [CreateAssetMenu(fileName = "BenchmarkSettings", menuName = "Boat Attack/System/Benchmark Settings")]
     public class BenchmarkConfigData : ScriptableObject
     {
-        public FinishAction finishAction;
         public bool saveData;
         public bool disableVSync = true;
         public bool stats = false;
@@ -37,6 +36,7 @@ namespace BoatAttack.Benchmark
     {
         Exit,
         ShowStats,
+        MainMenu,
         Nothing
     }
 

@@ -43,6 +43,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b37edc8ef99daa74397bbf52c22e104b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  simpleRunScene: 1
+  urpVersion: 10.2.0
+  simpleRunScene: -1
   settings: {fileID: 11400000, guid: f525f78734ee248a1a0f6f2364632759, type: 2}
-  simpleRun: 1
+  simpleRun: 0

@@ -3,12 +3,16 @@ using System.Linq;
 using BoatAttack.Benchmark;
 using UnityEditor;
 using UnityEditor.Build.Reporting;
+using UnityEditor.PackageManager;
 using UnityEditor.SceneManagement;
+using UnityEditorInternal;
 using UnityEngine;
+using PackageInfo = UnityEditor.PackageManager.PackageInfo;
 
 public class BenchmarkWindow : EditorWindow
 {
     private static readonly string benchmarkLoaderPath = "Assets/scenes/benchmark/loader.unity";
+    private static readonly string benchmarkPrefabPath = "Assets/objects/misc/[benchmark].prefab";
 
     [MenuItem("Tools/Benchmark")]
     static void Init()
@@ -24,7 +28,7 @@ public class BenchmarkWindow : EditorWindow
     }
 
     private static string assetGuidKey = "boatattack.benchmark.assetguid";
-    private static string assetGUID;
+    private static string assetGUID = "";
     private static BenchmarkConfigData _benchConfigData;
 
     private int currentRunIndex = 0;
@@ -33,6 +37,8 @@ public class BenchmarkWindow : EditorWindow
     private const int ToolbarWidth = 150;
     private List<PerfResults> PerfResults = new List<PerfResults>();
     private string[] resultFiles;
+    private List<string[]> resultItems = new List<string[]>();
+    private int currentFile;
     private int currentResult;
     private int currentRun = 0;
     private BuildTarget target;
@@ -47,6 +53,9 @@ public class BenchmarkWindow : EditorWindow
     {
         target = EditorUserBuildSettings.activeBuildTarget;
         assetGUID = EditorPrefs.GetString(assetGuidKey);
+        if (assetGUID == "")
+            assetGUID = AssetDatabase.GUIDFromAssetPath("Assets/resources/benchmarksettings.asset").ToString();
+        
         _benchConfigData = AssetDatabase.LoadAssetAtPath<BenchmarkConfigData>(AssetDatabase.GUIDToAssetPath(assetGUID));
     }
 
@@ -97,43 +106,55 @@ public class BenchmarkWindow : EditorWindow
 
     private void DrawBuildSettings()
     {
-        target = (BuildTarget)EditorGUILayout.EnumPopup(target);
-        var maskOptions = _benchConfigData.benchmarkData.Select(data => data.benchmarkName).ToArray();
-
-        EditorGUILayout.BeginHorizontal();
-
-        var mask = -1;
-        mask = EditorGUILayout.MaskField("Benchmark Suite", mask, maskOptions);
-        if (GUILayout.Button($"Build & Run"))
+        if (_benchConfigData != null)
         {
-            BuildBenchmark();
+            target = (BuildTarget) EditorGUILayout.EnumPopup(target);
+            var maskOptions = _benchConfigData.benchmarkData.Select(data => data.benchmarkName).ToArray();
+
+            EditorGUILayout.BeginHorizontal();
+
+            EditorGUILayout.LabelField("Benchmark Suite");
+            //var mask = -1;
+            //mask = EditorGUILayout.MaskField("Benchmark Suite", mask, maskOptions);
+            if (GUILayout.Button($"Build & Run"))
+            {
+                SetupBenchmarkPrefab();
+                BuildBenchmark();
+            }
+
+            if (GUILayout.Button($"Run in Editor"))
+            {
+                SetupBenchmarkPrefab();
+                RunBenchmark();
+            }
+
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.BeginHorizontal();
+
+            currentRunIndex = EditorGUILayout.Popup("Benchmark Scene", currentRunIndex, maskOptions);
+            if (GUILayout.Button($"Build & Run"))
+            {
+                SetupBenchmarkPrefab(currentRunIndex);
+                BuildStaticBenchmark(currentRunIndex);
+            }
+
+            if (GUILayout.Button($"Run in Editor"))
+            {
+                //setup the things
+                SetupBenchmarkPrefab(currentRunIndex);
+                RunBenchmark();
+            }
+
+            EditorGUILayout.EndHorizontal();
         }
-        if (GUILayout.Button($"Run in Editor"))
+        else
         {
-            RunBenchmark();
+            EditorGUILayout.HelpBox("No Benchmark configuration file present in settings section.", MessageType.Warning, true);
         }
-
-        EditorGUILayout.EndHorizontal();
-
-        EditorGUILayout.BeginHorizontal();
-
-        currentRunIndex = EditorGUILayout.Popup("Benchmark Scene", currentRunIndex, maskOptions);
-        if (GUILayout.Button($"Build & Run"))
-        {
-            SetupStaticBenchmark(currentRunIndex);
-            BuildStaticBenchmark(currentRunIndex);
-        }
-        if (GUILayout.Button($"Run in Editor"))
-        {
-            //setup the things
-            SetupStaticBenchmark(currentRunIndex);
-            RunBenchmark();
-        }
-
-        EditorGUILayout.EndHorizontal();
     }
 
-    private void DrawBenchmarkSettings()
+    private static void DrawBenchmarkSettings()
     {
         EditorGUI.BeginChangeCheck();
         _benchConfigData = (BenchmarkConfigData) EditorGUILayout.ObjectField(new GUIContent("Benchmark Data File"), _benchConfigData,
@@ -151,40 +172,27 @@ public class BenchmarkWindow : EditorWindow
         }
     }
 
-    private void SetupStaticBenchmark(int index = -1)
+    private static void SetupBenchmarkPrefab(int index = -1)
     {
-        if (index == -1)
-        {
-            // setup and run all suite
-            EditorSceneManager.playModeStartScene = GetBenchmarkLoader();
-        }
-        else
-        {
-            // setup and run single scene
-            var benchmarkPrefabPath = "Assets/objects/misc/[benchmark].prefab";
-
-            using (var benchmarkPrefab = new PrefabUtility.EditPrefabContentsScope(benchmarkPrefabPath))
-            {
-                if (benchmarkPrefab.prefabContentsRoot.TryGetComponent(out Benchmark b))
-                {
-                    b.simpleRun = true;
-                    b.simpleRunScene = index;
-                }
-            }
-        }
+        // setup benchmark prefab
+        using var benchmarkPrefab = new PrefabUtility.EditPrefabContentsScope(benchmarkPrefabPath);
+        if (!benchmarkPrefab.prefabContentsRoot.TryGetComponent(out Benchmark b)) return;
+        b.simpleRun = index != -1;
+        b.simpleRunScene = index;
+        b.urpVersion = GetURPPackageVersion();
     }
 
     private void RunBenchmark()
     {
         EditorSceneManager.playModeStartScene = GetBenchmarkLoader();
-        EditorApplication.delayCall += EditorApplication.EnterPlaymode;
+        EditorApplication.EnterPlaymode();
     }
 
     private void BuildBenchmark()
     {
         var buildOptions = new BuildPlayerOptions();
 
-        var sceneList = new List<string> {"Assets/scenes/menu_benchmark.unity"};
+        var sceneList = new List<string> {benchmarkLoaderPath};
         sceneList.AddRange(_benchConfigData.benchmarkData.Select(benchSettings => benchSettings.scene));
         buildOptions.scenes = sceneList.ToArray();
 
@@ -246,7 +254,7 @@ public class BenchmarkWindow : EditorWindow
 
     private void DrawResults()
     {
-        if (PerfResults == null || PerfResults.Count == 0)
+        if (PerfResults == null || PerfResults.Count == 0 || resultFiles?.Length == 0 || resultItems?.Count == 0)
         {
             UpdateFiles();
         }
@@ -254,7 +262,8 @@ public class BenchmarkWindow : EditorWindow
         if (PerfResults != null && PerfResults.Count > 0)
         {
             EditorGUILayout.BeginHorizontal();
-            currentResult = EditorGUILayout.Popup(new GUIContent("File"), currentResult, resultFiles);
+            currentFile = EditorGUILayout.Popup(new GUIContent("File"), currentFile, resultFiles);
+            currentResult = EditorGUILayout.Popup(new GUIContent("Results"), currentResult, resultItems[currentFile]);
             if (GUILayout.Button("reload", GUILayout.Width(100)))
             {
                 UpdateFiles();
@@ -263,9 +272,9 @@ public class BenchmarkWindow : EditorWindow
 
             EditorGUILayout.Space(4);
 
-            DrawPerfInfo(PerfResults[currentResult].perfStats[0].info);
+            DrawPerfInfo(PerfResults[currentFile].perfStats[currentResult].info);
 
-            DrawPerf(PerfResults[currentResult].perfStats[0]);
+            DrawPerf(PerfResults[currentFile].perfStats[currentResult]);
         }
         else
         {
@@ -473,16 +482,27 @@ public class BenchmarkWindow : EditorWindow
     private void UpdateFiles()
     {
         PerfResults = Benchmark.LoadAllBenchmarkStats();
-        resultFiles = new string[PerfResults.Count];
-        for (var index = 0; index < PerfResults.Count; index++)
+        resultFiles = PerfResults.Select(result => result.fileName).ToArray();
+        foreach (var file in PerfResults)
         {
-            resultFiles[index] = PerfResults[index].fileName;
+            resultItems.Add(file.perfStats.Select(perf => perf.info.BenchmarkName).ToArray());
         }
     }
 
     private static SceneAsset GetBenchmarkLoader()
     {
         return (SceneAsset)AssetDatabase.LoadAssetAtPath(benchmarkLoaderPath, typeof(SceneAsset));
+    }
+
+    public static string GetURPPackageVersion()
+    {
+        List<PackageInfo> packageJsons = AssetDatabase.FindAssets("package")
+            .Select(AssetDatabase.GUIDToAssetPath).Where(x => AssetDatabase.LoadAssetAtPath<TextAsset>(x) != null)
+            .Select(PackageInfo.FindForAssetPath).ToList();
+
+        var URPInfo = packageJsons.Find(x => x.name == "com.unity.render-pipelines.universal");
+
+        return URPInfo.version;
     }
 
     #endregion

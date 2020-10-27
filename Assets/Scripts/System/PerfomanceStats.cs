@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using BoatAttack;
 using BoatAttack.Benchmark;
+using TMPro;
 using UnityEngine;
 using UnityEngine.Profiling;
 using UnityEngine.UI;
@@ -10,38 +11,33 @@ public class PerfomanceStats : MonoBehaviour
 {
 	// Frame time stats
 	private PerfBasic Stats;
+	private TestInfo defaultInfo;
 	private float frametime;
 	private float runtime;
 
 	// Demo stuff
-	public bool autoMode = false;
+	public PerfMode mode = PerfMode.DisplayOnly;
 	private const int demoFrames = 1000;
 
 	// TempData
 	private float averageFrametime;
-	private List<float> avgSamples = new List<float>(60);// data for average value - in milliseconds
+	private float averageVel;
 	private FrameData minFrame = FrameData.DefaultMin;
 	private FrameData maxFrame = FrameData.DefaultMax;
 
 	// UI display
-    private Text frametimeDisplay;
+    private TextMeshProUGUI frametimeDisplay;
     private string debugInfo;
-
-    // FrameDisplay
-    public LineRenderer line;
-
+    
     private void Start()
     {
-	    if (autoMode)
-	    {
-		    Stats = new PerfBasic("AutoTest", demoFrames);
-		    CreateTextGui();
-	    }
+	    CreateTextGui();
+		defaultInfo = new TestInfo("Test");
     }
 
     public void StartRun(string benchmarkName, int runLength)
     {
-	    Stats = new PerfBasic(benchmarkName, runLength);
+	    Stats = new PerfBasic(benchmarkName, Benchmark.UrpVersion, runLength);
 	    if(frametimeDisplay == null)
 			CreateTextGui();
     }
@@ -49,15 +45,11 @@ public class PerfomanceStats : MonoBehaviour
     private void Update ()
     {
 	    if (!frametimeDisplay) return;
-
-
+	    
 	    // Timing
 	    frametime = Time.unscaledDeltaTime * 1000f;
 	    runtime += Time.unscaledDeltaTime;
 
-	    avgSamples.Insert(0, frametime);
-	    if(avgSamples.Count > 60)
-		    avgSamples.RemoveAt(60);
 	    UpdateFrametime();
 
 	    //Displaying
@@ -68,28 +60,31 @@ public class PerfomanceStats : MonoBehaviour
 	    DrawText(mem, gpu);
 
 	    //Saving Data
-	    if (Benchmark.currentRunIndex >= 0 && Benchmark.currentRunIndex < Stats.RunData.Length)
+	    if (mode == PerfMode.Benchmark && Stats != null)
 	    {
-		    var runData = Stats.RunData?[Benchmark.currentRunIndex];
-		    if(runData == null)
-			    Stats.RunData[0] = new RunData(new float[Benchmark.current.runLength]);
+		    if (Benchmark.CurrentRunIndex >= 0 && Benchmark.CurrentRunIndex < Stats.RunData.Length)
+		    {
+			    var runData = Stats.RunData?[Benchmark.CurrentRunIndex];
+			    if (runData == null)
+				    Stats.RunData[0] = new RunData(new float[Benchmark.Current.runLength]);
 
-		    runData.rawSamples[Benchmark.currentRunFrame] = frametime; // add sample
+			    runData.rawSamples[Benchmark.CurrentRunFrame] = frametime; // add sample
+		    }
 	    }
 
 	    // Auto mode
-        if (autoMode)
+        if (mode == PerfMode.DisplayOnly)
         {
-	        Benchmark.currentRunFrame++;
-	        if (Benchmark.currentRunFrame >= demoFrames)
-		        Benchmark.currentRunFrame = 0;
+	        Benchmark.CurrentRunFrame++;
+	        if (Benchmark.CurrentRunFrame >= demoFrames)
+		        Benchmark.CurrentRunFrame = 0;
         }
     }
 
     private void DrawText(string memory, string gpuMemory)
 	{
 		frametimeDisplay.text = "";
-		var info = Stats.info;
+		var info = mode == PerfMode.Benchmark ? Stats?.info ?? defaultInfo : defaultInfo;
 		debugInfo = $"<b>Unity:</b>{info.UnityVersion}   " +
 		            $"<b>URP:</b>{info.UrpVersion}   " +
 		            $"<b>Build:</b>{info.BoatAttackVersion}   " +
@@ -98,13 +93,13 @@ public class PerfomanceStats : MonoBehaviour
 		            //////////////////////////////////////////////////
 		            $"<b>DeviceInfo:</b>{info.Platform}   " +
 		            $"{info.API}   " +
-		            $"{info.Os.Replace(" ", "")}\n" +
+		            $"{info.Os}\n" +
 		            //////////////////////////////////////////////////
 		            $"<b>CPU:</b>{info.CPU}   " +
 		            $"<b>GPU:</b>{info.GPU}   " +
 		            $"<b>Resolution:</b>{info.Resolution}\n" +
 		            //////////////////////////////////////////////////
-		            $"<b>CurrentFrame:</b>{Benchmark.currentRunFrame}   " +
+		            $"<b>CurrentFrame:</b>{Benchmark.CurrentRunFrame}   " +
 		            $"<b>Mem:</b>{memory}mb   " +
 		            $"<b>GPUMem:</b>{gpuMemory}mb\n" +
 		            //////////////////////////////////////////////////
@@ -116,14 +111,14 @@ public class PerfomanceStats : MonoBehaviour
 
 	public void EndRun()
 	{
-		var runNumber = Benchmark.currentRunIndex == -1 ? "Warmup" : (Benchmark.currentRunIndex + 1).ToString();
+		var runNumber = Benchmark.CurrentRunIndex == -1 ? "Warmup" : (Benchmark.CurrentRunIndex + 1).ToString();
 		Debug.Log($"<b>{Stats.info.BenchmarkName} " +
 		          $"Run {runNumber}:" +
 		          $"TotalRuntime:{runtime:#0.00}s</b>\n{debugInfo}");
 
-		if (Benchmark.currentRunIndex >= 0 && !Benchmark.SimpleRun)
+		if (Benchmark.CurrentRunIndex >= 0 && !Benchmark.SimpleRun)
 		{
-			Stats.RunData[Benchmark.currentRunIndex].EndRun(runtime, minFrame, maxFrame);
+			Stats.RunData[Benchmark.CurrentRunIndex].EndRun(runtime, minFrame, maxFrame);
 		}
 
 		minFrame = FrameData.DefaultMin;
@@ -139,34 +134,29 @@ public class PerfomanceStats : MonoBehaviour
 
 	private void UpdateFrametime()
 	{
-		averageFrametime = 0.0f;
-        var sampleDivision = 1.0f / avgSamples.Count;
-
-        foreach (var t in avgSamples)
-        {
-	        averageFrametime += t * sampleDivision;
-        }
+		averageFrametime = Mathf.SmoothDamp(averageFrametime, frametime, ref averageVel, 5.0f);
+		averageFrametime = Mathf.SmoothDamp(averageFrametime, frametime, ref averageVel, 5.0f);
 
         if (minFrame.ms > frametime)
         {
-	        minFrame.Set(Benchmark.currentRunFrame, frametime);
+	        minFrame.Set(Benchmark.CurrentRunFrame, frametime);
         }
 
         if (maxFrame.ms < frametime)
         {
-	        maxFrame.Set(Benchmark.currentRunFrame, frametime);
+	        maxFrame.Set(Benchmark.CurrentRunFrame, frametime);
         }
 	}
 
 	private void CreateTextGui()
 	{
-		var textGo = new GameObject("perfText", typeof(Text));
+		var textGo = new GameObject("perfText", typeof(TextMeshProUGUI));
 		textGo.transform.SetParent(AppSettings.ConsoleCanvas.transform, true);
 
-		frametimeDisplay = textGo.GetComponent<Text>();
-		frametimeDisplay.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-		frametimeDisplay.fontSize = 20;
+		frametimeDisplay = textGo.GetComponent<TextMeshProUGUI>();
+		frametimeDisplay.fontSize = 20.0f;
 		frametimeDisplay.lineSpacing = 1.2f;
+		frametimeDisplay.characterSpacing = 5.0f;
 		frametimeDisplay.raycastTarget = false;
 
 		var rectTransform = frametimeDisplay.rectTransform;
@@ -174,17 +164,9 @@ public class PerfomanceStats : MonoBehaviour
 		rectTransform.anchorMax = Vector2.one;
 	}
 
-	/*void SetGraphData()
+	public enum PerfMode
 	{
-		line.positionCount = avgSamples.Count;
-		var points = new Vector3[avgSamples.Count];
-		for (int i = 0; i < points.Length; i++)
-		{
-			var x = Mathf.Lerp(1f, -1f, (float) i / avgSamples.Count);
-			var y = (avgSamples[i] - Stats.Average) * 0.02f;
-			points[i] = new Vector3(x, y, 0f);
-		}
-
-		line.SetPositions(points);
-	}*/
+		Benchmark,
+		DisplayOnly
+	}
 }

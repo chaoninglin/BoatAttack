@@ -40,6 +40,28 @@ public static class Utility
         return Regex.Replace(input, @"\s+", "");
     }
 
+    public static void SafeDestroyChildren(GameObject obj)
+    {
+        SafeDestroyChildren(obj.transform);
+    }
+
+    public static void SafeDestroyChildren(Transform obj)
+    {
+        foreach (Transform child in obj)
+        {
+            SafeDestroy(child.gameObject);
+        }
+    }
+
+    public static void ParentAndFillRectTransform(Transform child, Transform parent)
+    {
+        var tableTrans = child.transform as RectTransform;
+        tableTrans.SetParent(parent, false);
+        tableTrans.anchorMin = Vector2.zero;
+        tableTrans.anchorMax = Vector2.one;
+        tableTrans.offsetMin = tableTrans.offsetMax = Vector2.zero;
+    }
+
     public static void SafeDestroy(Object obj)
     {
         if (obj != null)

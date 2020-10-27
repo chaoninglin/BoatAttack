@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using UnityEngine;
@@ -15,49 +16,60 @@ namespace BoatAttack.Benchmark
     public class Benchmark : MonoBehaviour
     {
         // data
+        public bool autoStart = true;
+        private bool singleBench = false;
+        [HideInInspector] public string urpVersion = "N/A";
+        public static string UrpVersion;
         [HideInInspector] public int simpleRunScene = -1;
         public BenchmarkConfigData settings;
         public bool simpleRun = false;
+        public FinishAction finish = FinishAction.Exit;
         public static bool SimpleRun;
-        private int benchIndex;
-        public static BenchmarkData current { get; private set; }
+        private int _benchIndex;
+        public static BenchmarkData Current { get; private set; }
 
         private static PerfomanceStats _stats;
 
         // Timing data
-        //public static int totalRuns;
-        public static int currentRunIndex;
-        //public static int totalFrames;
-        public static int currentRunFrame;
-        private int totalRunFrames;
-        private bool running = false;
+        public static int CurrentRunIndex;
+        public static int CurrentRunFrame;
+        private int _totalRunFrames;
+        private bool _running = false;
 
         // Bench results
-        private Dictionary<int, List<PerfBasic>> _perfData = new Dictionary<int, List<PerfBasic>>();
-        public static List<PerfResults> PerfResults = new List<PerfResults>();
-
-        //public AssetReference perfStatsUI;
-        //public AssetReference perfSummaryUI;
+        private readonly List<PerfBasic> _perfData = new List<PerfBasic>();
 
         private void Start()
         {
             if (settings == null) AppSettings.ExitGame("Benchmark Not Setup");
+            
+            SceneManager.sceneLoaded += OnSceneLoaded;
 
+            if (autoStart)
+            {
+                Initialize();
+            }
+        }
+
+        public void Initialize()
+        {
+            UrpVersion = urpVersion;
             if(settings.disableVSync)
                 QualitySettings.vSyncCount = 0;
-            SceneManager.sceneLoaded += OnSceneLoaded;
             _stats = gameObject.AddComponent<PerfomanceStats>();
             DontDestroyOnLoad(gameObject);
 
             if (simpleRun && settings.benchmarkData?[simpleRunScene] != null)
             {
+                _stats.mode = PerfomanceStats.PerfMode.DisplayOnly;
                 SimpleRun = simpleRun;
-                current = settings.benchmarkData[simpleRunScene];
+                Current = settings.benchmarkData?[simpleRunScene];
                 LoadBenchmark();
             }
             else
             {
-                current = settings.benchmarkData[benchIndex];
+                _stats.mode = PerfomanceStats.PerfMode.Benchmark;
+                Current = settings.benchmarkData?[_benchIndex];
                 LoadBenchmark();
             }
         }
@@ -65,30 +77,39 @@ namespace BoatAttack.Benchmark
         private void OnDestroy()
         {
             RenderPipelineManager.endFrameRendering -= EndFrameRendering;
+#if UNITY_EDITOR
+            EditorSceneManager.playModeStartScene = null; // need to reset benchmark start scene once benchmark is destroyed
+#endif
+        }
+
+        public void LoadBenchmark(int index)
+        {
+            singleBench = true;
+            _benchIndex = index;
+            Initialize();
         }
 
         private void LoadBenchmark()
         {
-            _perfData.Add(benchIndex, new List<PerfBasic>());
-            AppSettings.LoadScene(current.scene);
+            AppSettings.LoadScene(Current.scene);
         }
 
         private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
-            if (scene.path != current.scene) return;
+            if (scene.path != Current.scene) return;
 
-            if (current.warmup)
+            if (Current.warmup)
             {
-                currentRunIndex = -1;
+                CurrentRunIndex = -1;
             }
             else
             {
-                currentRunIndex = 0;
+                CurrentRunIndex = 0;
             }
 
-            currentRunFrame = 0;
+            CurrentRunFrame = 0;
 
-            switch (current.type)
+            switch (Current.type)
             {
                 case BenchmarkType.Scene:
                     break;
@@ -101,7 +122,7 @@ namespace BoatAttack.Benchmark
 
             _stats.enabled = settings.stats;
             if(settings.stats)
-                _stats.StartRun(current.benchmarkName, current.runLength);
+                _stats.StartRun(Current.benchmarkName, Current.runLength);
 
             BeginRun();
             RenderPipelineManager.endFrameRendering += EndFrameRendering;
@@ -109,17 +130,17 @@ namespace BoatAttack.Benchmark
 
         private void BeginRun()
         {
-            currentRunFrame = 0;
+            CurrentRunFrame = 0;
         }
 
         private void EndFrameRendering(ScriptableRenderContext context, Camera[] cameras)
         {
-            currentRunFrame++;
-            if (currentRunFrame < current.runLength) return;
+            CurrentRunFrame++;
+            if (CurrentRunFrame < Current.runLength) return;
             _stats.EndRun();
 
-            currentRunIndex++;
-            if (currentRunIndex < current.runs || simpleRun)
+            CurrentRunIndex++;
+            if (CurrentRunIndex < Current.runs || simpleRun)
             {
                 BeginRun();
             }
@@ -133,11 +154,11 @@ namespace BoatAttack.Benchmark
         public void EndBenchmark()
         {
             if(settings.saveData) SaveBenchmarkStats();
-            benchIndex++;
+            _benchIndex++;
 
-            if (benchIndex < settings.benchmarkData.Count)
+            if (_benchIndex < settings.benchmarkData.Count && !singleBench)
             {
-                current = settings.benchmarkData[benchIndex];
+                Current = settings.benchmarkData[_benchIndex];
                 LoadBenchmark();
             }
             else
@@ -148,7 +169,9 @@ namespace BoatAttack.Benchmark
 
         private void FinishBenchmark()
         {
-            switch (settings.finishAction)
+            SaveBenchmarkFile();
+            SceneManager.MoveGameObjectToScene(gameObject, SceneManager.GetActiveScene());
+            switch (finish)
             {
                 case FinishAction.Exit:
                     AppSettings.ExitGame();
@@ -156,6 +179,9 @@ namespace BoatAttack.Benchmark
                 case FinishAction.ShowStats:
                     break;
                 case FinishAction.Nothing:
+                    break;
+                case FinishAction.MainMenu:
+                    AppSettings.LoadScene(0);
                     break;
                 default:
                     AppSettings.ExitGame("Benchmark Not Setup");
@@ -165,43 +191,37 @@ namespace BoatAttack.Benchmark
 
         private void SaveBenchmarkStats()
         {
-            if (settings.stats)
+            var stats = _stats.EndBench();
+            if (stats != null)
             {
-                var stats = _stats.EndBench();
-                if (stats != null)
-                {
-                    _perfData[benchIndex].Add(stats);
-                }
+                _perfData.Add(stats);
             }
-
-            var path = GetResultPath() + $"/{_perfData[benchIndex][0].info.BenchmarkName}.txt";
-            var data = new string[_perfData[benchIndex].Count];
-
-            for (var index = 0; index < _perfData[benchIndex].Count; index++)
-            {
-                var perfData = _perfData[benchIndex][index];
-                data[index] = JsonUtility.ToJson(perfData);
-            }
-            var results = new PerfResults();
-            results.fileName = Path.GetFileName(path);
-            results.filePath = Path.GetFullPath(path);
-            results.timestamp = DateTime.Now;
-            results.perfStats = _perfData[benchIndex].ToArray();
-            PerfResults.Add(results);
-            File.WriteAllLines(path, data);
         }
 
-        public static string GetResultPath()
+        private void SaveBenchmarkFile()
         {
-            string path;
-            if (Application.isEditor)
+            // File name
+            var dateTimeNow = DateTime.Now;
+            var filename = $"{Application.productName}-{SystemInfo.deviceName}-{dateTimeNow.ToShortDateString()}-{dateTimeNow.ToShortTimeString()}";
+            filename = Path.GetInvalidFileNameChars().Aggregate(filename, (current, c) => current.Replace(c, '-'));
+            var path = GetResultPath() + $"/{filename}.json";
+            
+            // Pack results
+            var results = new PerfResults
             {
-                path = Directory.GetParent(Application.dataPath).ToString();
-            }
-            else
-            {
-                path = Application.persistentDataPath;
-            }
+                fileName = Path.GetFileName(path),
+                filePath = Path.GetFullPath(path),
+                timestamp = DateTime.Now.ToString(DateTimeFormatInfo.InvariantInfo),
+                perfStats = _perfData.ToArray()
+            };
+
+            // Write file
+            File.WriteAllText(path, JsonUtility.ToJson(results));
+        }
+
+        private static string GetResultPath()
+        {
+            var path = Application.isEditor ? Directory.GetParent(Application.dataPath).ToString() : Application.persistentDataPath;
             path += "/PerformanceResults";
 
             if (!Directory.Exists(path))
@@ -212,37 +232,20 @@ namespace BoatAttack.Benchmark
 
         public static List<PerfResults> LoadAllBenchmarkStats()
         {
-            if (PerfResults.Count > 0)
+            var list = new List<PerfResults>();
+            var fileList = Directory.GetFiles(GetResultPath());
+
+            foreach (var file in fileList)
             {
-                return PerfResults;
+                if(!File.Exists(file))
+                    break;
+
+                var data = File.ReadAllText(file);
+                var result = JsonUtility.FromJson<PerfResults>(data);
+                list.Add(result);
             }
-            else
-            {
-                var list = new List<PerfResults>();
-                var fileList = Directory.GetFiles(GetResultPath());
 
-                foreach (var file in fileList)
-                {
-                    if(!File.Exists(file))
-                        break;
-
-                    var result = new PerfResults();
-                    var data = File.ReadAllLines(file);
-
-                    if(data.Length == 0)
-                        break;
-
-                    //process data
-                    result.fileName = Path.GetFileName(file);
-                    result.filePath = Path.GetFullPath(file);
-                    result.timestamp = File.GetCreationTime(file);
-                    var perfData = data.Select(t => (PerfBasic) JsonUtility.FromJson(t, typeof(PerfBasic))).ToArray();
-                    result.perfStats = perfData;
-                    list.Add(result);
-                }
-
-                return list;
-            }
+            return list;
         }
     }
 
@@ -261,21 +264,22 @@ namespace BoatAttack.Benchmark
     {
         public string fileName;
         public string filePath;
-        public DateTime timestamp;
+        public string timestamp;
         public PerfBasic[] perfStats;
     }
 
+    [Serializable]
     public class PerfBasic
     {
         public TestInfo info;
         public int Frames;
         public RunData[] RunData;
 
-        public PerfBasic(string benchmarkName, int frames)
+        public PerfBasic(string benchmarkName, string urpVersion, int frames)
         {
             Frames = frames;
-            info = new TestInfo(benchmarkName);
-            RunData = new RunData[Benchmark.current.runs];
+            info = new TestInfo(benchmarkName) {UrpVersion = urpVersion};
+            RunData = new RunData[Benchmark.Current.runs];
             for (var index = 0; index < RunData.Length; index++)
             {
                 RunData[index] = new RunData(new float[frames]);
@@ -354,12 +358,12 @@ namespace BoatAttack.Benchmark
         public string Quality;
         public string Resolution;
 
-        public TestInfo(string benchmarkName)
+        public TestInfo(string benchmarkName, string urpVersion = "N/A")
         {
             BenchmarkName = benchmarkName;
             Scene = Utility.RemoveWhitespace(SceneManager.GetActiveScene().name);
             UnityVersion = Application.unityVersion;
-            UrpVersion = "N/A";
+            UrpVersion = urpVersion;
             BoatAttackVersion = Application.version;
             Platform =  Utility.RemoveWhitespace(Application.platform.ToString());
             API =  Utility.RemoveWhitespace(SystemInfo.graphicsDeviceType.ToString());

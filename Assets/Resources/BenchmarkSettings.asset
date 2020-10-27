@@ -24,10 +24,12 @@ MonoBehaviour:
     runs: 3
     runLength: 500
     warmup: 1
+    enabled: 1
   - benchmarkName: Island Static
     sceneAsset: {fileID: 102900000, guid: bf8529d52d0dac843b94245ecf955d4a, type: 3}
     scene: Assets/scenes/testing/benchmark_island-static.unity
     type: 0
     runs: 5
     runLength: 25
-    warmup: 0
+    warmup: 1
+    enabled: 1

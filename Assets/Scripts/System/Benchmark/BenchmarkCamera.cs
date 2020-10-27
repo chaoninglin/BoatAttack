@@ -11,9 +11,9 @@ namespace BoatAttack.Benchmark
 
         private void Awake()
         {
-            if (Benchmark.current != null)
+            if (Benchmark.Current != null)
             {
-                Frames = Benchmark.current.runLength;
+                Frames = Benchmark.Current.runLength;
             }
 
             foreach (var cam in cameras)
