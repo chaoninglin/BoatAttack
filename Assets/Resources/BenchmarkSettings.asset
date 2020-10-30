@@ -12,10 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 09efa0b32c4cb4a97a3a9c78e03dd4ce, type: 3}
   m_Name: BenchmarkSettings
   m_EditorClassIdentifier: 
-  finishAction: 0
   saveData: 1
   disableVSync: 1
-  stats: 1
+  stats: 0
   benchmarkData:
   - benchmarkName: Island Flythrough
     sceneAsset: {fileID: 102900000, guid: c7a97972985ccaf4a9c8daf7e1db85ed, type: 3}

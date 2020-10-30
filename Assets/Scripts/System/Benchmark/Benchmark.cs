@@ -56,19 +56,22 @@ namespace BoatAttack.Benchmark
             UrpVersion = urpVersion;
             if(settings.disableVSync)
                 QualitySettings.vSyncCount = 0;
-            _stats = gameObject.AddComponent<PerfomanceStats>();
+            if(settings.stats)
+                _stats = gameObject.AddComponent<PerfomanceStats>();
             DontDestroyOnLoad(gameObject);
 
             if (simpleRun && settings.benchmarkData?[simpleRunScene] != null)
             {
-                _stats.mode = PerfomanceStats.PerfMode.DisplayOnly;
+                if(settings.stats)
+                    _stats.mode = PerfomanceStats.PerfMode.DisplayOnly;
                 SimpleRun = simpleRun;
                 Current = settings.benchmarkData?[simpleRunScene];
                 LoadBenchmark();
             }
             else
             {
-                _stats.mode = PerfomanceStats.PerfMode.Benchmark;
+                if(settings.stats)
+                    _stats.mode = PerfomanceStats.PerfMode.Benchmark;
                 Current = settings.benchmarkData?[_benchIndex];
                 LoadBenchmark();
             }
@@ -120,7 +123,6 @@ namespace BoatAttack.Benchmark
                     break;
             }
 
-            _stats.enabled = settings.stats;
             if(settings.stats)
                 _stats.StartRun(Current.benchmarkName, Current.runLength);
 
@@ -137,7 +139,9 @@ namespace BoatAttack.Benchmark
         {
             CurrentRunFrame++;
             if (CurrentRunFrame < Current.runLength) return;
-            _stats.EndRun();
+            
+            if(settings.stats)
+                _stats.EndRun();
 
             CurrentRunIndex++;
             if (CurrentRunIndex < Current.runs || simpleRun)
@@ -153,7 +157,7 @@ namespace BoatAttack.Benchmark
 
         public void EndBenchmark()
         {
-            if(settings.saveData) SaveBenchmarkStats();
+            if(settings.stats && settings.saveData) SaveBenchmarkStats();
             _benchIndex++;
 
             if (_benchIndex < settings.benchmarkData.Count && !singleBench)
@@ -248,18 +252,7 @@ namespace BoatAttack.Benchmark
             return list;
         }
     }
-
-#if UNITY_EDITOR
-    public class BenchmarkTool
-    {
-        [MenuItem("Boat Attack/Benchmark/Island Flythrough")]
-        public static void IslandFlyThrough()
-        {
-
-        }
-    }
-#endif
-
+    
     public class PerfResults
     {
         public string fileName;
