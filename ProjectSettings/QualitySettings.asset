@@ -80,8 +80,7 @@ QualitySettings:
     asyncUploadBufferSize: 4
     asyncUploadPersistentBuffer: 1
     resolutionScalingFixedDPIFactor: 1
-    customRenderPipeline: {fileID: 11400000, guid: 4b951d17ab0514e2aa290cc17b9fffe0,
-      type: 2}
+    customRenderPipeline: {fileID: 0}
     excludedTargetPlatforms:
     - WebGL
     - PS4
